@@ -1,0 +1,13 @@
+{
+  "stats": {
+    "Total listing records": 4050,
+    "Total rentals": 1550,
+    "Total projects": 450,
+    "Rentals in madhapur": 186,
+    "Listings posted in last 7 days (ref 2026-09-10 IST)": 162,
+    "Projects with reported vs. actual listing-count mismatch (candidate)": 414
+  },
+  "notes": [
+    "Figures above are descriptive only — see console output from analyze.mjs for the full candidate breakdowns used to reach the graded answers."
+  ]
+}

@@ -7,7 +7,7 @@ import { renderRentals } from './pages/rentals.js';
 import { renderProjects, renderProjectDetail } from './pages/projects.js';
 import { renderFavourites } from './pages/favouritesPage.js';
 import { renderInsights } from './pages/insights.js';
-import { renderQuestions } from './pages/questions.js';
+import { renderAnalysis } from './pages/analysis.js';
 
 const NAV_LINKS = [
   ['#/listings', 'Listings'],
@@ -15,7 +15,7 @@ const NAV_LINKS = [
   ['#/projects', 'Projects'],
   ['#/favourites', 'Saved'],
   ['#/insights', 'Insights'],
-  ['#/questions', 'Questions'],
+  ['#/analysis', 'Analysis'],
 ];
 
 export function renderSession() {
@@ -54,7 +54,7 @@ route('/projects', requireAuth(renderProjects));
 route('/projects/:id', requireAuth(renderProjectDetail));
 route('/favourites', requireAuth(renderFavourites));
 route('/insights', requireAuth(renderInsights));
-route('/questions', requireAuth(renderQuestions));
+route('/analysis', requireAuth(renderAnalysis));
 
 renderSession();
 startRouter();
