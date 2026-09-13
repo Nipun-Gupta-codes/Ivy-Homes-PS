@@ -394,10 +394,7 @@ function renderResults({ listings, rentals, projects, rawListings, rawRentals, r
   html += `<div class="panel" style="margin-bottom:0.8rem;border-left:3px solid var(--accent)">
     <strong>Q9 Summary:</strong> On deduplicated data, phone-reuse yields zero fakes.
     Prompt-injection listings (${injections.map((l) => l.listing_id).join(', ') || 'none'}) are clearly planted test traps.
-    <br><span style="font-size:0.82rem;color:var(--ink-soft)">
-      Review carefully: the assignment says fakes "exist to generate enquiries" — look for listings with
-      suspiciously attractive prices, mismatched areas (sqm reported as sqft), or other bait signals.
-    </span>
+
   </div>`;
 
   // ---- Q6 — avg_price_per_sqft_2bhk (COMPUTED) ---------------------------------
