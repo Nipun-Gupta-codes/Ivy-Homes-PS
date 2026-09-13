@@ -41,11 +41,7 @@ export async function renderInsights(params, app) {
 
   if (!listings) {
     app.innerHTML = `<div class="notice error">
-      No local data found. Run <code>scripts/fetch-all-data.mjs</code> first to pull the full dataset,
-      then reload this page.
-      <br><br>
-      Note: the documented <code>/v1/analytics/summary</code> endpoint returns 404 on the live API — this is a
-      <code>missing_endpoint</code> finding.
+      No local data found.
     </div>`;
     return;
   }
@@ -93,7 +89,6 @@ export async function renderInsights(params, app) {
   html += `<h2>City summary — Hyderabad</h2>
     <p style="font-size:0.85rem;color:var(--ink-soft)">
       Computed directly from local data files (${listings.length} listings, ${rentals?.length || 0} rentals, ${projects?.length || 0} projects).
-      <br>The documented <code>/v1/analytics/summary</code> endpoint returns 404 — that's a <code>missing_endpoint</code> finding.
     </p>
     <div class="stat-grid">
       <div class="stat-card"><div class="num">${listings.length.toLocaleString('en-IN')}</div><div class="label">Total listings</div></div>
@@ -132,7 +127,7 @@ export async function renderInsights(params, app) {
       html += `<div class="panel">${discoveries.notes.map((n) => `<p>${n}</p>`).join('')}</div>`;
     }
   } else {
-    html += `<div class="notice">Run <code>scripts/fetch-all-data.mjs</code> then <code>scripts/analyze.mjs</code>, and drop the output at <code>data/insights.json</code>, to populate this section with data-quality findings.</div>`;
+    html += `<div class="notice">No discoveries found.</div>`;
   }
 
   app.innerHTML = html;

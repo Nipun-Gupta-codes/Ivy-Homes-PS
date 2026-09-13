@@ -29,12 +29,7 @@ export async function renderQuestions(params, app) {
   app.innerHTML = `
     <div class="panel">
       <h2>Answer the 10 questions</h2>
-      <p style="color:var(--ink-soft);font-size:0.9rem">
-        Pulls every retrievable listing, rental and project once (paginated, ~150 requests total —
-        well under the 1200/min limit), then computes what has one clear definition directly,
-        and shows candidate evidence for what needs your judgment call.
-        Watch the browser console for every request this sends.
-      </p>
+
       <div class="filters" style="margin-top:1rem">
         <label style="font-size:0.85rem">Assigned locality
           <input type="text" id="q-locality" value="madhapur" style="display:block;margin-top:0.2rem" />
@@ -146,13 +141,13 @@ export async function renderQuestions(params, app) {
 
       <div class="panel" style="margin-bottom:1rem">
         <h3>Sample listing — raw fields</h3>
-        <p style="font-size:0.85rem;color:var(--ink-soft)">Check this against the documented listing object for missing/renamed/extra fields.</p>
+
         <pre style="font-size:0.78rem;overflow-x:auto;background:var(--accent-soft);padding:0.8rem;border-radius:3px">${JSON.stringify(sample, null, 2)}</pre>
       </div>
 
       <div class="panel" style="margin-bottom:1rem">
         <h3>Q10 — project listing-count mismatches (candidate)</h3>
-        <p style="font-size:0.85rem;color:var(--ink-soft)">Comparing each project's reported <code>total_listings</code> against a count of retrievable listings with that <code>project_id</code>. ${mismatches.length} mismatch(es) found. Docs say this should always agree — double check whether "retrievable" here should be filtered by <code>is_live</code> if that field exists.</p>
+        <p style="font-size:0.85rem;color:var(--ink-soft)">Comparing each project's reported <code>total_listings</code> against actual count of retrievable listings.</p>
         <table class="locality-table"><thead><tr><th>project_id</th><th>Reported</th><th>Actual</th></tr></thead>
         <tbody>${mismatches.slice(0, 30).map((m) => `<tr><td><a href="#/projects/${m.project_id}" target="_blank">${m.project_id}</a></td><td>${m.reported}</td><td>${m.actual}</td></tr>`).join('')}</tbody></table>
       </div>
@@ -179,7 +174,7 @@ export async function renderQuestions(params, app) {
         <h3>Q9 — "fake listing" candidates</h3>
         <p><strong>Phone numbers reused across &gt;3 listings:</strong> ${repeatedPhones.length} numbers.
         ${repeatedPhones.length ? `Most-reused: <code>${repeatedPhones[0][0]}</code> (${repeatedPhones[0][1]} listings) — ${idLinks(worstPhoneIds)}` : ''}</p>
-        <p style="font-size:0.85rem;color:var(--ink-soft)">Check descriptions and posted_by_name on these for other shared patterns before finalizing.</p>
+
       </div>
 
       ${(() => {

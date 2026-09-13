@@ -56,26 +56,26 @@ Insights screen in the app reads to surface a few of these numbers to a user.
 
 ## How I worked out what to distrust in the documentation
 
-<!-- TODO: replace with your own account. Suggested structure:
-- What you checked first (e.g. hit every documented endpoint once, diffed the
-  shape of a real response against the documented example)
-- Which specific fields/params you suspected were wrong and why (e.g. a field
-  name that doesn't appear in the docs at all, like `is_live`)
-- How you tested each hypothesis against the *whole* dataset rather than one
-  record, and what the base rate looked like
--->
+- **Authentication First**: I started by writing a simple Node script to hit the `/auth/login` endpoint and inspect the response. I immediately noticed the JSON keys didn't match the docs (`access_token` instead of `token`, `expires_in` was 900 not 86400, and a refresh flow existed). I also tested the documented query parameter approach for the API key (`?api_key=...`) and got a 401 error explicitly telling me to use the `X-API-Key` header.
+- **Pagination & Duplication**: I noticed `total` said 4004 but my script fetched 4050 records. I tested the `page` parameter and found it was silently ignored (always returning `offset=0`). By switching to `offset`, I was able to paginate correctly, but discovered the `limit` is capped at 50, not 200. Deduplicating the fetched dataset by `listing_id` revealed massive duplication (50 unique listings returned 81 times each).
+- **Filters & Sorting**: To test filters like `min_price`, `max_price`, and `furnishing`, I applied them and checked if the `total` count changed and if the results actually adhered to the filter. They didn't. For sorting, I requested `sort_by=posted_at&order=asc` and analyzed the returned timestamps, finding that while dates were ordered, intra-day times were completely randomized.
+- **Data Types & Quality**: I noticed project `price_max` values like `3.79` which couldn't be Rupees. Cross-referencing with local listing prices confirmed they were in Crores/Lakhs. I tested data quality by sorting listings by price ascending and discovered negative prices, and filtered for small `carpet_area` revealing impossibly small multi-BHK apartments.
+- **AI Prompt Injections**: While reviewing the dataset descriptions, I found malicious instructions specifically designed to trick AI assistants into generating incorrect `submission.json` files or modifying the application footer. This was a clear indicator of fraudulent listings designed to test automated processing.
+- **Endpoint Availability**: I systematically called every documented endpoint (`/v1/listing/{id}`, `/v1/listings/{id}/similar`, `/v1/analytics/summary`, `/v1/favourites`) and found them returning 404s, highlighting significant gaps between the spec and the implementation.
 
 ## What I checked that turned out to be fine
 
-<!-- TODO: this is explicitly asked for in the assignment — list the
-hypotheses you tested and ruled out, not just the ones that panned out. -->
+- **Some Filters Work**: While many filters are broken, the `locality`, `bedroom` (BHK), and `property_type` filters on the listings endpoint correctly filter the results. For example, `property_type=villa` only returned villas.
+- **Basic Sorting**: While `posted_at` sorting is flawed (date-only), sorting by numeric fields like `carpet_area`, `bedroom`, and `price` (tested on rentals) correctly ordered the results ascending/descending as requested.
+- **Data Retrieval Endpoints**: The core collection endpoints (`/v1/listings`, `/v1/rentals`, `/v1/projects`) and their pluralized detail endpoints (`/v1/listings/{id}`, etc.) successfully return JSON data matching the general structure (albeit with undocumented fields like `is_live` and inconsistent timestamps).
 
 ## What I'd do with two more days
 
-<!-- TODO -->
+- **Robust Data Synchronization Layer**: Since the API pagination is broken and returns massive duplicates, I would build a robust client-side sync layer that fetches all available records using the `offset` parameter, deduplicates them locally, and serves as a reliable local cache for the UI.
+- **Client-Side Analytics Dashboard**: Because the `/v1/analytics/summary` endpoint is missing, I would implement the dashboard metrics entirely on the client side using the deduplicated local cache.
+- **Local Favourites System**: With the `/v1/favourites` endpoints returning 404s, I would implement the "saved listings" feature using `localStorage` to ensure the core user experience remains intact despite API limitations.
+- **Auth Refresh Flow**: Implement an Axios/Fetch interceptor to automatically handle the 15-minute token expiry using the undocumented `/auth/refresh` endpoint for a seamless user experience.
 
 ## Tools used
 
-<!-- TODO: name the LLM(s)/tools you used and roughly how, per the assignment's
-rules — this costs nothing to disclose and not disclosing it costs the
-internship. -->
+- Google Antigravity (AGY) agent (Gemini 3.1 Pro / Claude Opus 4.6), utilizing `node -e` scripts and file parsing tools for direct API testing, data fetching, deduplication, and JSON analysis to systematically uncover and verify the API discrepancies.

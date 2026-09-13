@@ -194,9 +194,7 @@ export async function renderAnalyticsSummary(params, app) {
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:1.2rem">
         <div>
           <h2>Analytics Summary</h2>
-          <p style="color:var(--ink-soft);font-size:0.9rem">
-            Executive audit findings &amp; results for Questions 1–10 (verified from <code>scripts/analyze.mjs</code>)
-          </p>
+
         </div>
         <div style="display:flex;gap:0.6rem;flex-wrap:wrap">
           <a href="/v1/analytics" class="button secondary">← Analytics Workbench</a>
@@ -208,7 +206,6 @@ export async function renderAnalyticsSummary(params, app) {
       <div class="panel" style="margin-bottom:1.5rem;background:#fff;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1rem">
         <div>
           <strong>📍 Assigned Locality:</strong>
-          <span style="color:var(--ink-soft);font-size:0.88rem;margin-left:0.5rem">Used to evaluate Question 5 (Total Monthly Rent)</span>
         </div>
         <div style="display:flex;gap:0.5rem;align-items:center">
           <select id="locality-select" style="padding:0.4rem 0.6rem;border:1px solid var(--line);border-radius:var(--radius);font-size:0.88rem">
