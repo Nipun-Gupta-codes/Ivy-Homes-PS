@@ -2,9 +2,18 @@ import { apiGet } from '../api.js';
 import { formatInr, formatArea, formatDate, paginationControls } from '../util.js';
 import { isFavourited, addFavourite, removeFavourite, loadFavourites } from '../favourites.js';
 import { isLoggedIn } from '../auth.js';
+import { navigate } from '../router.js';
 
-// Client-side filtering is applied on top of whatever the server returns,
-// so filters work correctly even if a given server-side param turns out to be a no-op.
+function dedup(arr, keyField) {
+  const seen = new Set();
+  return arr.filter((item) => {
+    const k = item[keyField];
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
 function applyClientFilters(results, filters) {
   return results.filter((l) => {
     if (filters.locality && (l.locality || '').toLowerCase() !== filters.locality.toLowerCase()) return false;
@@ -14,6 +23,30 @@ function applyClientFilters(results, filters) {
     if (filters.furnishing && (l.furnishing || '').toLowerCase() !== filters.furnishing.toLowerCase()) return false;
     return true;
   });
+}
+
+let cachedListings = null;
+
+async function fetchListingsList() {
+  if (cachedListings && cachedListings.length > 0) return cachedListings;
+
+  try {
+    const res = await fetch('/data/listings.json');
+    if (res.ok) {
+      const data = await res.json();
+      cachedListings = dedup(data, 'listing_id');
+      return cachedListings;
+    }
+  } catch { /* fall through */ }
+
+  try {
+    const body = await apiGet('/v1/listings', { limit: 200 }, { auth: true });
+    cachedListings = dedup(body.results || [], 'listing_id');
+    return cachedListings;
+  } catch (err) {
+    if (cachedListings) return cachedListings;
+    throw err;
+  }
 }
 
 export async function renderListings(params, app) {
@@ -40,7 +73,7 @@ export async function renderListings(params, app) {
       </select>
       <button id="apply-filters">Apply</button>
     </div>
-    <div id="results"></div>
+    <div id="results"><div class="empty">Loading…</div></div>
   `;
 
   document.getElementById('apply-filters').onclick = () => {
@@ -58,86 +91,86 @@ export async function renderListings(params, app) {
   async function load() {
     const resultsBox = document.getElementById('results');
     resultsBox.innerHTML = '<div class="empty">Loading…</div>';
+
     try {
-      // Ask the server to filter too (in case the param does work) — client filter is the safety net.
-      const body = await apiGet('/v1/listings', {
-        page: state.page,
-        limit: state.limit,
-        locality: state.filters.locality || undefined,
-        bhk: state.filters.bhk || undefined,
-        min_price: state.filters.min_price || undefined,
-        max_price: state.filters.max_price || undefined,
-        furnishing: state.filters.furnishing || undefined,
-      }, { auth: true });
-      const numbered = (body.results || []).map((l, i) => ({ ...l, __n: (state.page - 1) * state.limit + i + 1 }));
-      const filtered = applyClientFilters(numbered, state.filters);
+      const allListings = await fetchListingsList();
+      const filtered = applyClientFilters(allListings, state.filters);
 
       const noFiltersActive = !state.filters.locality && !state.filters.bhk && !state.filters.min_price && !state.filters.max_price && !state.filters.furnishing;
       document.getElementById('total-banner').textContent = noFiltersActive
-        ? `The API reports ${body.total.toLocaleString('en-IN')} total listing records with no filters applied — this "total" field on any page answers Q1 directly, no need to page through everything for just that number. (Full pagination is still needed for Q2–Q10, which look at every record's contents — use the Analysis tab for those.)`
-        : `${body.total.toLocaleString('en-IN')} records match your current filters (this is filtered, not the Q1 answer — clear filters to see the unfiltered total).`;
+        ? `Showing ${allListings.length.toLocaleString('en-IN')} unique listings (unfiltered). The API returns ~81× duplicates in raw pagination.`
+        : `${filtered.length.toLocaleString('en-IN')} unique listings match your current filters.`;
 
       if (isLoggedIn()) {
-        try { await loadFavourites(); } catch { /* non-fatal, save buttons just start unstarred */ }
+        try { await loadFavourites(); } catch { /* non-fatal */ }
       }
 
-      if (filtered.length === 0) {
-        resultsBox.innerHTML = '<div class="empty">No listings match your filters on this page. Try Next, or widen your filters.</div>';
-      } else {
-        resultsBox.innerHTML = '';
-        for (const l of filtered) {
-          const row = document.createElement('a');
-          row.href = `#/listings/${encodeURIComponent(l.listing_id)}`;
-          row.className = 'list-row';
-          row.innerHTML = `
-            <div class="main">
-              <h3><span style="color:var(--ink-soft);font-weight:400">#${l.__n}</span> ${l.apartment_name || l.property_type} — ${l.bedroom ?? '?'} BHK</h3>
-              <div class="meta">
-                <span class="tag">${l.locality || ''}</span>
-                <span class="tag">${l.property_type || ''}</span>
-                <span class="tag">${l.furnishing || ''}</span>
-                Posted ${formatDate(l.posted_at)}
-              </div>
+      const total = filtered.length;
+      const start = (state.page - 1) * state.limit;
+      const end = Math.min(start + state.limit, total);
+      const pageItems = filtered.slice(start, end);
+
+      if (pageItems.length === 0) {
+        resultsBox.innerHTML = '<div class="empty">No listings match your filters. Try widening your filters.</div>';
+        return;
+      }
+
+      resultsBox.innerHTML = '';
+      pageItems.forEach((l, i) => {
+        const itemNumber = start + i + 1;
+        const row = document.createElement('a');
+        row.href = `/v1/listings/${encodeURIComponent(l.listing_id)}`;
+        row.className = 'list-row';
+        row.innerHTML = `
+          <div class="main">
+            <h3><span style="color:var(--ink-soft);font-weight:400">#${itemNumber}</span> ${l.apartment_name || l.property_type} — ${l.bedroom ?? '?'} BHK</h3>
+            <div class="meta">
+              <span class="tag">${l.locality || ''}</span>
+              <span class="tag">${l.property_type || ''}</span>
+              <span class="tag">${l.furnishing || ''}</span>
+              Posted ${formatDate(l.posted_at)}
             </div>
-            <div class="price">${formatInr(l.price)}<small>${formatArea(l.carpet_area)}</small></div>
-          `;
+          </div>
+          <div class="price">${formatInr(l.price)}<small>${formatArea(l.carpet_area)}</small></div>
+        `;
 
-          const saveBtn = document.createElement('button');
-          saveBtn.className = `save-btn ${isFavourited(l.listing_id) ? 'saved' : ''}`;
-          saveBtn.style.marginLeft = '0.75rem';
-          saveBtn.textContent = isFavourited(l.listing_id) ? '★' : '☆';
-          saveBtn.title = isFavourited(l.listing_id) ? 'Remove from saved' : 'Save this listing';
-          saveBtn.onclick = async (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (!isLoggedIn()) {
-              location.hash = '#/login';
-              return;
+        const saveBtn = document.createElement('button');
+        saveBtn.className = `save-btn ${isFavourited(l.listing_id) ? 'saved' : ''}`;
+        saveBtn.style.marginLeft = '0.75rem';
+        saveBtn.textContent = isFavourited(l.listing_id) ? '★' : '☆';
+        saveBtn.title = isFavourited(l.listing_id) ? 'Remove from saved' : 'Save this listing';
+        saveBtn.onclick = async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!isLoggedIn()) {
+            navigate('/v1/login');
+            return;
+          }
+          try {
+            if (isFavourited(l.listing_id)) {
+              await removeFavourite(l.listing_id);
+              saveBtn.textContent = '☆';
+              saveBtn.classList.remove('saved');
+              saveBtn.title = 'Save this listing';
+            } else {
+              await addFavourite(l.listing_id);
+              saveBtn.textContent = '★';
+              saveBtn.classList.add('saved');
+              saveBtn.title = 'Remove from saved';
             }
-            try {
-              if (isFavourited(l.listing_id)) {
-                await removeFavourite(l.listing_id);
-                saveBtn.textContent = '☆';
-                saveBtn.classList.remove('saved');
-                saveBtn.title = 'Save this listing';
-              } else {
-                await addFavourite(l.listing_id);
-                saveBtn.textContent = '★';
-                saveBtn.classList.add('saved');
-                saveBtn.title = 'Remove from saved';
-              }
-            } catch (err) {
-              alert(err.message);
-            }
-          };
-          row.querySelector('.price').appendChild(saveBtn);
-          resultsBox.appendChild(row);
-        }
-      }
+          } catch (err) {
+            alert(err.message);
+          }
+        };
+        row.querySelector('.price').appendChild(saveBtn);
+        resultsBox.appendChild(row);
+      });
+
       resultsBox.appendChild(
-        paginationControls(state.page, body.total, state.limit, (p) => {
+        paginationControls(state.page, total, state.limit, (p) => {
           state.page = p;
           load();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         })
       );
     } catch (err) {

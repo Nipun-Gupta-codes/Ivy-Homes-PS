@@ -177,15 +177,50 @@ export async function renderQuestions(params, app) {
 
       <div class="panel">
         <h3>Q9 — "fake listing" candidates</h3>
-        <p><strong>Phone numbers reused across >3 listings:</strong> ${repeatedPhones.length} numbers.
+        <p><strong>Phone numbers reused across &gt;3 listings:</strong> ${repeatedPhones.length} numbers.
         ${repeatedPhones.length ? `Most-reused: <code>${repeatedPhones[0][0]}</code> (${repeatedPhones[0][1]} listings) — ${idLinks(worstPhoneIds)}` : ''}</p>
         <p style="font-size:0.85rem;color:var(--ink-soft)">Check descriptions and posted_by_name on these for other shared patterns before finalizing.</p>
       </div>
 
-      <div class="panel" style="margin-top:1rem">
-        <h3 style="margin-top:0">Q6 — do this last</h3>
-        <p style="font-size:0.9rem">Once you've decided your final <code>corrupt_listing_ids</code> (Q4) and <code>fake_listing_ids</code> (Q9) lists, compute: mean of (price / carpet_area) over listings where <code>is_live===true</code> and <code>bedroom===2</code>, excluding those two ID lists. Not auto-computed here since it depends on your finalized Q4/Q9 answers.</p>
-      </div>
+      ${(() => {
+        // Compute Q6 avg_price_per_sqft_2bhk
+        const corruptIds = new Set([
+          ...badFloor.map(l => l.listing_id),
+          ...badArea.map(l => l.listing_id),
+          ...badPrice.map(l => l.listing_id),
+          ...badRoomCount.map(l => l.listing_id),
+        ]);
+        const fakeIds = new Set();
+        for (const [phone] of repeatedPhones) {
+          for (const l of listings) {
+            if (l.posted_by_contact === phone) fakeIds.add(l.listing_id);
+          }
+        }
+        const excludeIds = new Set([...corruptIds, ...fakeIds]);
+        const eligible = listings.filter(l =>
+          l.is_live === true &&
+          l.bedroom === 2 &&
+          !excludeIds.has(l.listing_id) &&
+          l.carpet_area > 0 &&
+          l.price > 0
+        );
+        const values = eligible.map(l => l.price / l.carpet_area);
+        const avg = values.length > 0 ? values.reduce((s, v) => s + v, 0) / values.length : 0;
+        return `
+          <div class="stat-grid" style="margin-top:1rem">
+            <div class="stat-card"><div class="num">₹${Math.round(avg * 100) / 100}</div><div class="label">Q6 avg_price_per_sqft_2bhk</div></div>
+          </div>
+          <div class="panel" style="margin-top:0.5rem">
+            <h3 style="margin-top:0">Q6 — avg_price_per_sqft_2bhk</h3>
+            <p style="font-size:0.9rem">
+              Computed: mean(price ÷ carpet_area) over <strong>${eligible.length}</strong> listings
+              where <code>is_live===true</code> and <code>bedroom===2</code>,
+              excluding ${corruptIds.size} corrupt IDs (Q4) and ${fakeIds.size} fake IDs (Q9, phone reused >3×).
+              <br>Rounded: <strong>${Math.round(avg)}</strong> ₹/sqft
+            </p>
+          </div>
+        `;
+      })()}
     `;
   }
 }

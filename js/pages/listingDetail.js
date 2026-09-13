@@ -1,18 +1,66 @@
-import { apiGet } from '../api.js';
+import { apiGet, ApiError } from '../api.js';
 import { isFavourited, addFavourite, removeFavourite, loadFavourites } from '../favourites.js';
 import { isLoggedIn } from '../auth.js';
 import { formatInr, formatArea, formatDate } from '../util.js';
 
-export async function renderListingDetail(params, app) {
-  const { id } = params;
-  const l = await apiGet(`/v1/listing/${encodeURIComponent(id)}`, {}, { auth: true });
+// Cache the full listings array so repeated detail-page visits don't re-fetch.
+let _listingsCache = null;
 
-  if (isLoggedIn()) {
-    try { await loadFavourites(); } catch { /* non-fatal */ }
+async function getListingsCache() {
+  if (_listingsCache) return _listingsCache;
+  // Try local data file first (created by fetch-all-data.mjs)
+  try {
+    const res = await fetch('/data/listings.json');
+    if (res.ok) {
+      _listingsCache = await res.json();
+      return _listingsCache;
+    }
+  } catch { /* fall through */ }
+  return null;
+}
+
+// Look up a listing by id. Strategy:
+// 1. Try local ./data/listings.json (fastest, offline-capable)
+// 2. Try the paginated /v1/listings endpoint as a search fallback
+// 3. As last resort, try /v1/listing/{id} (the documented singular endpoint)
+async function fetchListing(id) {
+  // --- strategy 1: local data file ---
+  const local = await getListingsCache();
+  if (local) {
+    const found = local.find((l) => l.listing_id === id);
+    if (found) return found;
   }
 
+  // --- strategy 2: paginated search ---
+  // Some APIs let you filter by listing_id. Try it.
+  try {
+    const body = await apiGet('/v1/listings', { listing_id: id, limit: 1 }, { auth: true });
+    if (body.results && body.results.length > 0) return body.results[0];
+  } catch { /* fall through */ }
+
+  // --- strategy 3: singular endpoint (documented but may 404) ---
+  try {
+    return await apiGet(`/v1/listing/${encodeURIComponent(id)}`, {}, { auth: true });
+  } catch (err) {
+    if (err.status === 404) {
+      throw new ApiError(
+        `Listing "${id}" not found. The single-listing endpoint /v1/listing/{id} returns 404 on the live API — ` +
+        `this is a missing_endpoint finding. Make sure you've run scripts/fetch-all-data.mjs so the local data cache exists.`,
+        404
+      );
+    }
+    throw err;
+  }
+}
+
+export async function renderListingDetail(params, app) {
+  const { id } = params;
+  const l = await fetchListing(id);
+
+  await loadFavourites();
+
   app.innerHTML = `
-    <a href="#/listings" style="font-size:0.85rem;color:var(--ink-soft)">← Back to listings</a>
+    <a href="/v1/listings" style="font-size:0.85rem;color:var(--ink-soft)">← Back to listings</a>
     <div class="panel" style="margin-top:1rem">
       <div class="detail-grid">
         <div>
@@ -38,13 +86,14 @@ export async function renderListingDetail(params, app) {
           <dt>Parking</dt><dd>${l.covered_parking ?? '—'}</dd>
           <dt>Posted</dt><dd>${formatDate(l.posted_at)}</dd>
           <dt>Verified</dt><dd>${l.is_verified ? 'Yes' : 'No'}</dd>
+          <dt>Live</dt><dd>${l.is_live ? 'Yes' : 'No'}</dd>
           <dt>Listing ID</dt><dd style="font-size:0.8rem">${l.listing_id}</dd>
-          <dt>Project</dt><dd>${l.project_id ? `<a href="#/projects/${l.project_id}">${l.project_id}</a>` : '—'}</dd>
+          <dt>Project</dt><dd>${l.project_id ? `<a href="/v1/projects/${l.project_id}">${l.project_id}</a>` : '—'}</dd>
         </dl>
       </div>
     </div>
     <h3 style="margin-top:1.5rem">Similar listings</h3>
-    <div id="similar"></div>
+    <div id="similar"><div class="empty">Loading…</div></div>
   `;
 
   const saveBtn = document.getElementById('save-btn');
@@ -68,27 +117,41 @@ export async function renderListingDetail(params, app) {
     }
   };
 
+  // Similar listings — try API first, fall back to local similarity by locality + bedroom
+  const similarBox = document.getElementById('similar');
   try {
-    const similarBody = await apiGet(`/v1/listings/${encodeURIComponent(id)}/similar`, {}, { auth: true });
-    const similar = similarBody.results || similarBody; // tolerate either shape
-    const box = document.getElementById('similar');
+    let similar = [];
+    // Try API endpoint first
+    try {
+      const similarBody = await apiGet(`/v1/listings/${encodeURIComponent(id)}/similar`, {}, { auth: true });
+      similar = similarBody.results || similarBody;
+    } catch {
+      // Compute similarity locally from cached data
+      const allListings = await getListingsCache();
+      if (allListings) {
+        similar = allListings
+          .filter((s) => s.listing_id !== l.listing_id && s.locality === l.locality && s.bedroom === l.bedroom)
+          .slice(0, 10);
+      }
+    }
+
     if (!similar || similar.length === 0) {
-      box.innerHTML = '<div class="empty">No similar listings found.</div>';
+      similarBox.innerHTML = '<div class="empty">No similar listings found.</div>';
     } else {
-      box.innerHTML = '';
+      similarBox.innerHTML = '';
       for (const s of similar) {
         const row = document.createElement('a');
-        row.href = `#/listings/${encodeURIComponent(s.listing_id)}`;
+        row.href = `/v1/listings/${encodeURIComponent(s.listing_id)}`;
         row.className = 'list-row';
         row.innerHTML = `
           <div class="main"><h3>${s.apartment_name || s.property_type}</h3>
           <div class="meta">${s.locality || ''} · ${s.bedroom ?? '?'} BHK</div></div>
           <div class="price">${formatInr(s.price)}</div>
         `;
-        box.appendChild(row);
+        similarBox.appendChild(row);
       }
     }
   } catch (err) {
-    document.getElementById('similar').innerHTML = `<div class="notice error">${err.message}</div>`;
+    similarBox.innerHTML = `<div class="notice error">${err.message}</div>`;
   }
 }

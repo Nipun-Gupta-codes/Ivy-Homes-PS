@@ -201,3 +201,28 @@ a { color: inherit; }
 
 table.locality-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
 table.locality-table th, table.locality-table td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--line); }
+
+.button, a.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--radius);
+  text-decoration: none;
+  font-size: 0.88rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+.button:hover, a.button:hover { opacity: 0.9; }
+.button.secondary, a.button.secondary {
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.button.secondary:hover, a.button.secondary:hover {
+  background: var(--accent-soft);
+}

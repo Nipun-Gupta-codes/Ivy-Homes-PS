@@ -1,5 +1,6 @@
 import { login } from '../auth.js';
 import { renderSession } from '../main.js';
+import { navigate } from '../router.js';
 
 export function renderLogin(params, app) {
   app.innerHTML = `
@@ -20,7 +21,7 @@ export function renderLogin(params, app) {
     try {
       await login(email, password);
       renderSession();
-      location.hash = '#/listings';
+      navigate('/v1/listings');
     } catch (err) {
       errorBox.innerHTML = `<div class="notice error">${err.message}</div>`;
     }

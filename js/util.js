@@ -3,6 +3,23 @@ export function formatInr(amount) {
   return '₹' + Number(amount).toLocaleString('en-IN');
 }
 
+export function formatProjectPrice(val) {
+  if (val === null || val === undefined || val === '') return '—';
+  const n = Number(val);
+  if (isNaN(n) || n <= 0) return '—';
+  if (n >= 10) return `₹${n}L`;
+  return `₹${n}C`;
+}
+
+export function formatProjectPriceRange(min, max, sep = '–') {
+  const fMin = formatProjectPrice(min);
+  const fMax = formatProjectPrice(max);
+  if (fMin === '—' && fMax === '—') return '—';
+  if (fMin === '—') return fMax;
+  if (fMax === '—') return fMin;
+  return `${fMin}${sep}${fMax}`;
+}
+
 export function formatArea(sqft) {
   if (!sqft) return '—';
   return `${Number(sqft).toLocaleString('en-IN')} sqft`;
