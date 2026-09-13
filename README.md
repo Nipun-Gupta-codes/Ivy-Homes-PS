@@ -14,7 +14,7 @@ npm run serve        # or: python3 -m http.server 8080, or `npx serve .`
 ```
 
 Then open `http://localhost:8080`. Log in with one of the demo accounts
-(`demo1@ivy.homes` / password from your registration email).
+(`demo1@ivy.homes` / password).
 
 By default the app uses the API key baked into `js/config.js`. To use a
 different key without editing code, open the browser console and run:
@@ -23,11 +23,6 @@ different key without editing code, open the browser console and run:
 localStorage.setItem('ivy_api_key', 'IVY26-XXXXXXXXXXXX')
 ```
 
-### Deploying
-
-This is static HTML/CSS/JS with no build step, so any static host works —
-drag the folder into Netlify, or push to GitHub and enable GitHub Pages, or
-`vercel deploy` from inside the folder.
 
 ## Pulling the full dataset and answering the ten questions
 
